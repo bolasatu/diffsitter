@@ -1,0 +1,50 @@
+{
+  "name": "struct-match",
+  "version": "1.0.2",
+  "description": "A static-analysis library to search for code patterns in JS, with context constraints.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "npx tsc",
+    "mytest":"ts-node --transpileOnly src/testMetaVars.ts",
+    "testprint":"ts-node --transpileOnly src/printAst.ts snippet.js",
+    "testprint0":"ts-node --transpileOnly src/printAst.ts test_a.js",
+    "testprint2":"ts-node --transpileOnly src/printAst.ts unicornStudio.1.4.30.js",
+
+    "testmatch": "ts-node --transpileOnly src/searchAst.ts umd-short.js",
+    "testdiff": "ts-node --transpileOnly src/diffAst.ts test_a.js test_b.js",
+    "test": "jest"
+  },
+
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "tree-sitter": "0.21.1",
+    "tree-sitter-javascript": "^0.23.1",
+    "@ast-grep/napi": "~0.40.5",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.0.10",
+    "jest": "^30.0.3",
+    "ts-jest": "^29.4.0",
+    "typescript": "5.8.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apoorvsxna/struct-match.git"
+  },
+  "keywords": [
+    "ast",
+    "codemod",
+    "static-analysis",
+    "tree-sitter",
+    "search"
+  ],
+  "license": "GPL"
+}
