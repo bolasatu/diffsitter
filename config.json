@@ -1,0 +1,10 @@
+{
+  "input-processing": {
+    "exclude-kinds": [
+      "identifier",
+      "type_identifier"
+    ],
+    "split-graphemes": false
+  },
+  "doc": "check sample_config.json5"
+}
