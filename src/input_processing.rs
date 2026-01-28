@@ -74,7 +74,7 @@ impl Default for TreeSitterProcessor {
             exclude_kinds: None,
             include_kinds: None,
             strip_whitespace: true,
-            pseudo_leaf_types,
+            +,
         }
     }
 }

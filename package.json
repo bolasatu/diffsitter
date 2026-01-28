@@ -17,6 +17,7 @@
 
     "testmatch": "ts-node --transpileOnly src/searchAst.ts umd-short.js",
     "testdiff": "ts-node --transpileOnly src/diffAst.ts test_a.js test_b.js",
+    "testdiff-multi": "ts-node --transpileOnly src/diffAst.ts multi_a.js multi_b.js",
     "test": "jest"
   },
 

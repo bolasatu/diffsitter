@@ -1,8 +1,8 @@
 import JavaScript from 'tree-sitter-javascript';
 import Parser from "tree-sitter";
 import * as fs from 'fs';
-import { TreeSitterProcessor, Entry as TSEntry } from "./TreeSitterProcessor";
-import { RichHunksBuilder, RichHunks, RichHunk } from "./Hunk";
+import {TreeSitterProcessor, Entry as TSEntry} from "./TreeSitterProcessor";
+import {RichHunksBuilder, RichHunks, RichHunk} from "./Hunk";
 
 interface AstNode {
     type: string;
@@ -51,8 +51,6 @@ interface DiffResult {
     node: AstNode;
     sourceFile: 'A' | 'B';
 }
-
-
 
 
 /**
@@ -292,7 +290,7 @@ function myersDiffImpl<T>(
     if (oldStart >= oldEnd) {
         // All remaining elements in new are additions
         for (let i = newStart; i < newEnd; i++) {
-            result.push({ type: 'addition', value: newArr[i] });
+            result.push({type: 'addition', value: newArr[i]});
         }
         return;
     }
@@ -300,13 +298,13 @@ function myersDiffImpl<T>(
     if (newStart >= newEnd) {
         // All remaining elements in old are deletions
         for (let i = oldStart; i < oldEnd; i++) {
-            result.push({ type: 'deletion', value: old[i] });
+            result.push({type: 'deletion', value: old[i]});
         }
         return;
     }
 
     // Find the middle snake
-    const { old: xSplit, new: ySplit } = middleSnake(
+    const {old: xSplit, new: ySplit} = middleSnake(
         old, oldStart, oldEnd,
         newArr, newStart, newEnd,
         frontiers,
@@ -323,7 +321,11 @@ function myersDiffImpl<T>(
  * Ported from Rust diff.rs
  * Returns the shortest edit script to transform array A into array B
  */
-function myersDiff<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean): { op: 'insert' | 'delete' | 'equal'; value: T; index: number }[] {
+function myersDiff<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean): {
+    op: 'insert' | 'delete' | 'equal';
+    value: T;
+    index: number
+}[] {
     // Use the optimized linear-space implementation
     const editTypes: EditType<T>[] = [];
     const frontiers = createFrontiers(a.length, b.length);
@@ -339,10 +341,10 @@ function myersDiff<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean): { op: 'i
 
     for (const edit of editTypes) {
         if (edit.type === 'deletion') {
-            result.push({ op: 'delete', value: edit.value, index: aIdx });
+            result.push({op: 'delete', value: edit.value, index: aIdx});
             aIdx++;
         } else if (edit.type === 'addition') {
-            result.push({ op: 'insert', value: edit.value, index: bIdx });
+            result.push({op: 'insert', value: edit.value, index: bIdx});
             bIdx++;
         }
     }
@@ -423,9 +425,11 @@ export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText
 
     return results;
 }
+
 function printEntry(entry: DiffResult) {
     console.log(`${entry.operation} kind(${entry.node.type}) ${entry.node.text}`)
 }
+
 /**
  * Print diff results in a readable format
  */
@@ -448,7 +452,90 @@ function printDiffResults(results: DiffResult[]): void {
         console.log('');
     }
 }
+
+/**
+ * JSON output entry format matching diff-output.json
+ */
+interface JsonEntry {
+    text: string;
+    start_position: { row: number; column: number };
+    end_position: { row: number; column: number };
+    kind_id: string;
+}
+
+interface JsonLine {
+    line_index: number;
+    entries: JsonEntry[];
+}
+
+interface JsonHunk {
+    Old?: JsonLine[];
+    New?: JsonLine[];
+}
+
+interface JsonOutput {
+    hunks: JsonHunk[];
+    old: { filename: string; text: string };
+    new: { filename: string; text: string };
+}
+
+/**
+ * Print diff results as JSON grouped by hunks.
+ * Output format matches diff-output.json structure.
+ */
+function printJsonResults(
+    richHunks: RichHunks,
+    sourceA: string,
+    sourceB: string,
+    filePathA: string,
+    filePathB: string
+): void {
+    const jsonHunks: JsonHunk[] = [];
+
+    for (const richHunk of richHunks.getHunks()) {
+        const isOld = richHunk.type === 'old';
+        const lines = richHunk.value.getLines();
+
+        const jsonLines: JsonLine[] = lines.map(line => ({
+            line_index: line.lineIndex,
+            entries: line.entries.map(entry => ({
+                text: entry.text,
+                start_position: {
+                    row: entry.startPosition.row,
+                    column: entry.startPosition.column
+                },
+                end_position: {
+                    row: entry.endPosition.row,
+                    column: entry.endPosition.column
+                },
+                kind_id: entry.kindId
+            }))
+        }));
+
+        if (isOld) {
+            jsonHunks.push({Old: jsonLines});
+        } else {
+            jsonHunks.push({New: jsonLines});
+        }
+    }
+
+    const output: JsonOutput = {
+        hunks: jsonHunks,
+        old: {
+            filename: filePathA,
+            text: sourceA
+        },
+        new: {
+            filename: filePathB,
+            text: sourceB
+        }
+    };
+
+    console.log(JSON.stringify(output, null, 2));
+}
+
 const TEST_TREE_SITTER_PROCESSOR = false
+const JSON_OUTPUT = false
 
 // Main: Read two filepaths from arguments and compare
 const filePathA = process.argv[2];
@@ -469,8 +556,37 @@ if (TEST_TREE_SITTER_PROCESSOR) {
     const rootA = parseSource(contentA);
     const entries = treeSitterProcessor.process(rootA.tree, contentA, "JavaScript")
     entries.forEach(entry => console.log(`kind(${entry.kindId}) ${entry.text}`))
-}
-else {
-    const differences = diffAst(contentA, contentB, depth);
-    printDiffResults(differences);
+} else {
+    const richHunks = computeEditScript(contentA, contentB);
+    if (JSON_OUTPUT)
+        printJsonResults(richHunks, contentA, contentB, filePathA, filePathB);
+    else {
+
+        // Convert RichHunks to DiffResult array for backwards compatibility
+        const results: DiffResult[] = [];
+
+        for (const richHunk of richHunks.getHunks()) {
+            const sourceFile = richHunk.type === 'old' ? 'A' : 'B';
+            const operation = richHunk.type === 'old' ? 'delete' : 'insert';
+
+            for (const line of richHunk.value.getLines()) {
+                for (const entry of line.entries) {
+                    const node: AstNode = {
+                        type: entry.kindId,
+                        text: entry.text,
+                        startPosition: entry.startPosition,
+                        endPosition: entry.endPosition,
+                    };
+                    results.push({
+                        operation,
+                        node,
+                        sourceFile
+                    });
+                }
+            }
+        }
+
+
+        printDiffResults(results);
+    }
 }

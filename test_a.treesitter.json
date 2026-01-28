@@ -1,0 +1,96 @@
+
+{
+  "type": "program",
+  "text": "const b=  1",
+  "startPosition": {
+    "row": 0,
+    "column": 0
+  },
+  "endPosition": {
+    "row": 0,
+    "column": 11
+  },
+  "children": [
+    {
+      "type": "lexical_declaration",
+      "text": "const b=  1",
+      "startPosition": {
+        "row": 0,
+        "column": 0
+      },
+      "endPosition": {
+        "row": 0,
+        "column": 11
+      },
+      "children": [
+        {
+          "type": "const",
+          "text": "const",
+          "startPosition": {
+            "row": 0,
+            "column": 0
+          },
+          "endPosition": {
+            "row": 0,
+            "column": 5
+          },
+          "children": []
+        },
+        {
+          "type": "variable_declarator",
+          "text": "b=  1",
+          "startPosition": {
+            "row": 0,
+            "column": 6
+          },
+          "endPosition": {
+            "row": 0,
+            "column": 11
+          },
+          "children": [
+            {
+              "type": "identifier",
+              "text": "b",
+              "startPosition": {
+                "row": 0,
+                "column": 6
+              },
+              "endPosition": {
+                "row": 0,
+                "column": 7
+              },
+              "children": []
+            },
+            {
+              "type": "=",
+              "text": "=",
+              "startPosition": {
+                "row": 0,
+                "column": 7
+              },
+              "endPosition": {
+                "row": 0,
+                "column": 8
+              },
+              "children": []
+            },
+            {
+              "type": "number",
+              "text": "1",
+              "startPosition": {
+                "row": 0,
+                "column": 10
+              },
+              "endPosition": {
+                "row": 0,
+                "column": 11
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
