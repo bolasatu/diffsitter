@@ -1,7 +1,8 @@
 import JavaScript from 'tree-sitter-javascript';
 import Parser from "tree-sitter";
 import * as fs from 'fs';
-import {TreeSitterProcessor} from "./TreeSitterProcessor";
+import { TreeSitterProcessor, Entry as TSEntry } from "./TreeSitterProcessor";
+import { RichHunksBuilder, RichHunks, RichHunk } from "./Hunk";
 
 interface AstNode {
     type: string;
@@ -365,44 +366,64 @@ function parseSource(sourceCode: string): Parser.SyntaxNode {
 }
 
 /**
- * Compare two JavaScript files and return the differences
- * Uses Entry abstraction for comparison, mirroring the Rust implementation
+ * Compute the edit script and return RichHunks.
+ * Mirrors Rust compute_edit_script function from diff.rs
  */
-export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText = true): DiffResult[] {
+export function computeEditScript(sourceA: string, sourceB: string): RichHunks {
     const rootA = parseSource(sourceA);
     const rootB = parseSource(sourceB);
 
     // Convert AstNodes to Entries for comparison (mirrors Rust's process_vec_data)
-    const entriesA = treeSitterProcessor.process(rootA.tree,sourceA,"JavaScript")
-    const entriesB = treeSitterProcessor.process(rootB.tree,sourceB,"JavaScript")
-
-
+    const entriesA = treeSitterProcessor.process(rootA.tree, sourceA, "JavaScript");
+    const entriesB = treeSitterProcessor.process(rootB.tree, sourceB, "JavaScript");
 
     // Use Entry-based comparison (mirrors Rust's Entry::eq)
     const diffs = myersDiff(entriesA, entriesB, entryEquals);
 
+    // Convert edit script to RichHunks (mirrors Rust's RichHunks::try_from(edit_script))
+    const edits = diffs.map(diff => ({
+        type: diff.op === 'delete' ? 'deletion' as const : 'addition' as const,
+        value: diff.value
+    }));
+
+    return RichHunksBuilder.fromEdits(edits);
+}
+
+/**
+ * Compare two JavaScript files and return the differences
+ * Uses Entry abstraction and RichHunks, mirroring the Rust implementation
+ */
+export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText = true): DiffResult[] {
+    // Compute the edit script and get RichHunks
+    const richHunks = computeEditScript(sourceA, sourceB);
+
+    // Convert RichHunks to DiffResult array for backwards compatibility
     const results: DiffResult[] = [];
-    for (const diff of diffs) {
-        if (diff.op !== 'equal') {
-            // Extract the original AstNode from the Entry's reference
-            // todo have to create hunk like original rust
-            const node = {
-                type: diff.value.kindId,
-                text: diff.value.text,
-                startPosition: diff.value.startPosition,
-                endPosition: diff.value.endPosition,
-            };
-            results.push({
-                operation: diff.op,
-                node: node,
-                sourceFile: diff.op === 'delete' ? 'A' : 'B'
-            });
+
+    for (const richHunk of richHunks.getHunks()) {
+        const sourceFile = richHunk.type === 'old' ? 'A' : 'B';
+        const operation = richHunk.type === 'old' ? 'delete' : 'insert';
+
+        for (const line of richHunk.value.getLines()) {
+            for (const entry of line.entries) {
+                const node: AstNode = {
+                    type: entry.kindId,
+                    text: entry.text,
+                    startPosition: entry.startPosition,
+                    endPosition: entry.endPosition,
+                };
+                results.push({
+                    operation,
+                    node,
+                    sourceFile
+                });
+            }
         }
     }
 
     return results;
 }
-function printEntry(entry:DiffResult) {
+function printEntry(entry: DiffResult) {
     console.log(`${entry.operation} kind(${entry.node.type}) ${entry.node.text}`)
 }
 /**
@@ -446,7 +467,7 @@ const contentB = fs.readFileSync(filePathB, 'utf-8');
 
 if (TEST_TREE_SITTER_PROCESSOR) {
     const rootA = parseSource(contentA);
-    const entries = treeSitterProcessor.process(rootA.tree,contentA,"JavaScript")
+    const entries = treeSitterProcessor.process(rootA.tree, contentA, "JavaScript")
     entries.forEach(entry => console.log(`kind(${entry.kindId}) ${entry.text}`))
 }
 else {
