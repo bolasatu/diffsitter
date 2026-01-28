@@ -1,8 +1,8 @@
 import JavaScript from 'tree-sitter-javascript';
 import Parser from "tree-sitter";
 import * as fs from 'fs';
-import {TreeSitterProcessor, Entry as TSEntry} from "./TreeSitterProcessor";
-import {RichHunksBuilder, RichHunks, RichHunk} from "./Hunk";
+import { TreeSitterProcessor, Entry, entryEquals } from "./TreeSitterProcessor";
+import { RichHunksBuilder, RichHunks, RichHunk } from "./Hunk";
 
 interface AstNode {
     type: string;
@@ -12,38 +12,9 @@ interface AstNode {
     children?: AstNode[];
 }
 
-/**
- * Entry represents a mapping between a tree-sitter node and its text.
- * This is the unit of comparison for the diff algorithm.
- * Mirrors the Rust Entry struct from input_processing.rs
- */
-interface Entry {
-    /** The node type identifier (equivalent to kind_id in Rust) */
-    kindId: string;
-
-    /** The text content this entry refers to */
-    text: string;
-
-    /** The entry's start position in the document */
-    startPosition: { row: number; column: number };
-
-    /** The entry's end position in the document */
-    endPosition: { row: number; column: number };
-
-    /** Reference to the original AST node (for additional metadata if needed) */
-    reference?: AstNode;
-}
-
-/**
- * Compare two Entry objects for equality.
- * Two entries are equal if they have the same kindId and text.
- * This mirrors the PartialEq implementation in Rust.
- */
-function entryEquals(a: Entry, b: Entry): boolean {
-    return a.kindId === b.kindId && a.text === b.text;
-}
-
-const treeSitterProcessor = new TreeSitterProcessor()
+const treeSitterProcessor = new TreeSitterProcessor({
+    excludeKinds:new Set(["identifier","type_identifier"])
+})
 
 
 interface DiffResult {
@@ -290,7 +261,7 @@ function myersDiffImpl<T>(
     if (oldStart >= oldEnd) {
         // All remaining elements in new are additions
         for (let i = newStart; i < newEnd; i++) {
-            result.push({type: 'addition', value: newArr[i]});
+            result.push({ type: 'addition', value: newArr[i] });
         }
         return;
     }
@@ -298,13 +269,13 @@ function myersDiffImpl<T>(
     if (newStart >= newEnd) {
         // All remaining elements in old are deletions
         for (let i = oldStart; i < oldEnd; i++) {
-            result.push({type: 'deletion', value: old[i]});
+            result.push({ type: 'deletion', value: old[i] });
         }
         return;
     }
 
     // Find the middle snake
-    const {old: xSplit, new: ySplit} = middleSnake(
+    const { old: xSplit, new: ySplit } = middleSnake(
         old, oldStart, oldEnd,
         newArr, newStart, newEnd,
         frontiers,
@@ -341,10 +312,10 @@ function myersDiff<T>(a: T[], b: T[], equals: (x: T, y: T) => boolean): {
 
     for (const edit of editTypes) {
         if (edit.type === 'deletion') {
-            result.push({op: 'delete', value: edit.value, index: aIdx});
+            result.push({ op: 'delete', value: edit.value, index: aIdx });
             aIdx++;
         } else if (edit.type === 'addition') {
-            result.push({op: 'insert', value: edit.value, index: bIdx});
+            result.push({ op: 'insert', value: edit.value, index: bIdx });
             bIdx++;
         }
     }
@@ -513,9 +484,9 @@ function printJsonResults(
         }));
 
         if (isOld) {
-            jsonHunks.push({Old: jsonLines});
+            jsonHunks.push({ Old: jsonLines });
         } else {
-            jsonHunks.push({New: jsonLines});
+            jsonHunks.push({ New: jsonLines });
         }
     }
 
@@ -535,7 +506,8 @@ function printJsonResults(
 }
 
 const TEST_TREE_SITTER_PROCESSOR = false
-const JSON_OUTPUT = false
+const JSON_OUTPUT = true
+
 
 // Main: Read two filepaths from arguments and compare
 const filePathA = process.argv[2];
