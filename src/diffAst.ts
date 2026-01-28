@@ -1,6 +1,7 @@
 import JavaScript from 'tree-sitter-javascript';
 import Parser from "tree-sitter";
 import * as fs from 'fs';
+import {TreeSitterProcessor} from "./TreeSitterProcessor";
 
 interface AstNode {
     type: string;
@@ -41,25 +42,8 @@ function entryEquals(a: Entry, b: Entry): boolean {
     return a.kindId === b.kindId && a.text === b.text;
 }
 
-/**
- * Convert an AstNode to an Entry for diff comparison
- */
-function nodeToEntry(node: AstNode): Entry {
-    return {
-        kindId: node.type,
-        text: node.text ?? '',
-        startPosition: node.startPosition,
-        endPosition: node.endPosition,
-        reference: node,
-    };
-}
+const treeSitterProcessor = new TreeSitterProcessor()
 
-/**
- * Convert an array of AstNodes to an array of Entries
- */
-function nodesToEntries(nodes: AstNode[]): Entry[] {
-    return nodes.map(nodeToEntry);
-}
 
 interface DiffResult {
     operation: 'insert' | 'delete' | 'equal';
@@ -67,44 +51,8 @@ interface DiffResult {
     sourceFile: 'A' | 'B';
 }
 
-/**
- * Convert a tree-sitter node to a JSON-serializable object
- */
-function nodeToJson(node: Parser.SyntaxNode, textKey = false, depth = 1, currentLevel = 0): AstNode {
-    const result: AstNode = {
-        type: node.type,
-        text: textKey ? node.text : undefined,
-        startPosition: node.startPosition,
-        endPosition: node.endPosition,
-    };
-    if (currentLevel < depth) {
-        result.children = node.children.map(child => nodeToJson(child, textKey, depth, currentLevel + 1));
-    }
-    return result;
-}
 
-/**
- * Flatten AST nodes into an array for diffing
- */
-function flattenNodes(node: AstNode, depth = 1, currentLevel = 0): AstNode[] {
-    const nodes: AstNode[] = [node];
-    if (node.children && currentLevel < depth) {
-        for (const child of node.children) {
-            nodes.push(...flattenNodes(child, depth, currentLevel + 1));
-        }
-    }
-    return nodes;
-}
 
-/**
- * Create a unique key for a node (for comparison purposes)
- */
-function nodeKey(node: AstNode): string {
-    return JSON.stringify({
-        type: node.type,
-        text: node.text,
-    });
-}
 
 /**
  * Negative index vector - allows indexing with negative numbers
@@ -424,13 +372,11 @@ export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText
     const rootA = parseSource(sourceA);
     const rootB = parseSource(sourceB);
 
-    // Flatten AST nodes
-    const nodesA = flattenNodes(nodeToJson(rootA, includeText, depth), depth);
-    const nodesB = flattenNodes(nodeToJson(rootB, includeText, depth), depth);
-
     // Convert AstNodes to Entries for comparison (mirrors Rust's process_vec_data)
-    const entriesA = nodesToEntries(nodesA);
-    const entriesB = nodesToEntries(nodesB);
+    const entriesA = treeSitterProcessor.process(rootA.tree,sourceA,"JavaScript")
+    const entriesB = treeSitterProcessor.process(rootB.tree,sourceB,"JavaScript")
+
+
 
     // Use Entry-based comparison (mirrors Rust's Entry::eq)
     const diffs = myersDiff(entriesA, entriesB, entryEquals);
@@ -439,7 +385,8 @@ export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText
     for (const diff of diffs) {
         if (diff.op !== 'equal') {
             // Extract the original AstNode from the Entry's reference
-            const node = diff.value.reference ?? {
+            // todo have to create hunk like original rust
+            const node = {
                 type: diff.value.kindId,
                 text: diff.value.text,
                 startPosition: diff.value.startPosition,
@@ -455,7 +402,9 @@ export function diffAst(sourceA: string, sourceB: string, depth = 2, includeText
 
     return results;
 }
-
+function printEntry(entry:DiffResult) {
+    console.log(`${entry.operation} kind(${entry.node.type}) ${entry.node.text}`)
+}
 /**
  * Print diff results in a readable format
  */
@@ -474,10 +423,11 @@ function printDiffResults(results: DiffResult[]): void {
         const reset = '\x1b[0m';
 
         console.log(`${color}${prefix} (File ${diff.sourceFile})${reset}`);
-        console.log(JSON.stringify(diff.node, null, 2));
+        console.log(printEntry(diff));
         console.log('');
     }
 }
+const TEST_TREE_SITTER_PROCESSOR = false
 
 // Main: Read two filepaths from arguments and compare
 const filePathA = process.argv[2];
@@ -494,5 +444,12 @@ if (!filePathA || !filePathB) {
 const contentA = fs.readFileSync(filePathA, 'utf-8');
 const contentB = fs.readFileSync(filePathB, 'utf-8');
 
-const differences = diffAst(contentA, contentB, depth);
-printDiffResults(differences);
+if (TEST_TREE_SITTER_PROCESSOR) {
+    const rootA = parseSource(contentA);
+    const entries = treeSitterProcessor.process(rootA.tree,contentA,"JavaScript")
+    entries.forEach(entry => console.log(`kind(${entry.kindId}) ${entry.text}`))
+}
+else {
+    const differences = diffAst(contentA, contentB, depth);
+    printDiffResults(differences);
+}

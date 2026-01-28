@@ -102,7 +102,7 @@ export class TreeSitterProcessor {
     private pseudoLeafTypes: Map<string, Set<string>>;
 
     constructor(options: TreeSitterProcessorOptions = {}) {
-        this.splitGraphemes = options.splitGraphemes ?? true;
+        this.splitGraphemes = options.splitGraphemes ?? false; // this is not useful for our usecase ?todo
         this.excludeKinds = options.excludeKinds ?? null;
         this.includeKinds = options.includeKinds ?? null;
         this.stripWhitespace = options.stripWhitespace ?? true;
@@ -120,7 +120,7 @@ export class TreeSitterProcessor {
      * @param langName - The language name (for pseudo-leaf type lookup)
      */
     process(tree: Parser.Tree, text: string, langName: string): Entry[] {
-        const pseudoLeafTypes = this.pseudoLeafTypes.get(langName) ?? new Set<string>();
+        const pseudoLeafTypes = this.pseudoLeafTypes.get(langName) ?? new Set<string>();  // todo can default to new Set, only used for markdown
         const leaves = this.buildLeaves(tree.rootNode, text, pseudoLeafTypes);
 
         // Filter leaves based on include/exclude settings
